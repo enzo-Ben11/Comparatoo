@@ -1,0 +1,143 @@
+import groovy.json.JsonSlurper
+
+
+// Parsing en objets Groovy pour pouvoir agir sur les elements groovy qui compose la réponse
+def slurper7 = new JsonSlurper()
+def slurper21 = new JsonSlurper()
+
+def cheminserviceJdk7 = new File("C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/ReponseJson/Services-Middelaware-JDK7")
+def cheminserviceJdk21 = new File("C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/ReponseJson/Services-Middelaware-JDK21")
+
+def servicesJdk7 = cheminserviceJdk7.listFiles().findAll { it.name.endsWith(".json") }
+def servicesJdk21 = cheminserviceJdk21.listFiles().findAll { it.name.endsWith(".json") }
+
+for(service7 in servicesJdk7){
+	def nomService7 = service7.name.replaceAll("C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/ReponseJson/Services-Middelaware-JDK7","")
+	 	
+	def service21 = servicesJdk21.find { it.name == service7.name }
+	
+	/*
+	for (chemin21 in service21){
+		log.info("chemin 21 : " + chemin21)
+		def service21 = chemin21
+	}
+	*/
+	if(service21 != null){
+		if(service7.name.contains("getConsumptionDetails 1 - Request 1.json") || service7.name.contains("getInvoiceDetail 1 - Request 1.json") ||service7.name.contains("updatePersonalData 1 - Request 1.json"))continue
+		if(service21.name.contains("getConsumptionDetails 1 - Request 1.json") || service21.name.contains("getInvoiceDetail 1 - Request 1.json") ||service21.name.contains("updatePersonalData 1 - Request 1.json"))continue
+
+		def rapport = new File("C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/ReponseJson/rapport/${nomService7}.txt")  
+    		rapport.parentFile.mkdirs() // crée le dossier rapport/ s'il n'existe pas
+    		rapport.text = "" // reinitialise le fichier
+		
+		try{
+			//log.info("chemin service7 : "+service7)
+			//log.info("chemin service 21 : "+service21)
+			def jsonObject7 = slurper7.parseText(service7.text)
+			def jsonObject21 = slurper21.parseText(service21.text)
+			//Appel de la fonction
+			def differences  = compareReponse(jsonObject7,jsonObject21,rapport)
+			ecrireRapport(rapport,differences)
+
+		}
+		catch (Exception e){
+			//log.info("erreur pourt les services :  ${service7}")
+			//log.info("Erreur lors du parsing ou de la comparaison pour le fichier : ${service7.name}")
+    			log.info("Message d'erreur : ${e.message}")
+		}
+	}
+	else{
+		log.info("Les fichiers n'ont aucune correspondance")
+	}
+	
+}
+
+
+//IL MANQUE A REDIGER UN RAPPORT UNIQUEMNT QUAND UNE DIFFRENCE EST NOTABLE
+
+//----Methode pour faire la comparaison---------------------------------------------
+
+def compareReponse(jsonObject7, jsonObject21, rapport){
+	def difference = [] // Liste qui va regrouper les differences entre les 2 JsonObject correspondant aux reponse des services du middleware
+	//difference.add("\n") // Pour affichage empeche de faire ecrire rapport car remplit avec un espace donc plus vide
+	if(jsonObject7 instanceof Map && jsonObject21 instanceof Map){
+		def keyJdk7 = jsonObject7.keySet()
+		def keyJdk21 = jsonObject21.keySet()
+
+		// Clé presente que dans Jdk7
+		def OnlyInJdk7 = new HashSet<>(keyJdk7)
+		OnlyInJdk7.removeAll(keyJdk21)
+		if(OnlyInJdk7.isEmpty() == false){
+			difference.add("Cles manquantes dans Jdk21 : "  + OnlyInJdk7+ "\n")
+		}
+
+		//Clé présente que dans Jdk21
+		def OnlyInJdk21 = new HashSet<>(keyJdk21)
+		OnlyInJdk21.removeAll(keyJdk7)
+		if(OnlyInJdk21.isEmpty() == false){
+			difference.add("Cles manquantes dans Jdk7 : " + OnlyInJdk21 + "\n")
+		}
+		
+		//Quand on a les mêmes clés on doit verrifier les valeurs de celle ci
+		def inter = keyJdk7.intersect(keyJdk21)
+		for (key in inter){
+			def valeurJdk7 = jsonObject7[key]
+			def valeurJdk21 = jsonObject21[key]
+
+			// Si on a une Map 
+			//on fait une récursion sur les valeurs et on continue pour ne pas comparer les structure ebntre elle 
+			// On verrifie compare uniquemet les clés et non la structure en elle meme +  d'explication voir la documentation
+            	if (valeurJdk7 instanceof Map && valeurJdk21 instanceof Map) {
+                	difference.addAll(compareReponse(valeurJdk7, valeurJdk21,rapport))
+               	continue
+            	}
+
+            	// Si on a une Liste
+            	else if (valeurJdk7 instanceof List && valeurJdk21 instanceof List) {
+                	if (valeurJdk7.size() != valeurJdk21.size()){
+                    	difference.add("TAILLE LISTE différente : JDK7= ${valeurJdk7.size()} / JDK21= ${valeurJdk21.size()}\n")
+                	}
+                	else {
+                    	for (int i = 0; i < valeurJdk7.size(); i++) {
+    							difference.addAll(compareReponse(valeurJdk7[i], valeurJdk21[i],rapport))
+					}
+                	}
+               	continue
+            	}
+            	else{
+            		//Compare les types des variables
+            		if (valeurJdk7.getClass() != valeurJdk21.getClass()){
+					def typeJdk7 = valeurJdk7.getClass()
+					def typeJdk21 = valeurJdk21.getClass()
+					difference.add("ERREUR DE TYPE  : JDK 7 : ${valeurJdk7} est de type ${typeJdk7}  -->  JDK 21 : ${valeurJdk21} est de type ${typeJdk21}\n")
+				}
+				//Compare la valeur SI ils ont le même types
+				else if(valeurJdk21 != valeurJdk7){
+					difference.add("ERREUR DE VALEUR  : JDK7 : ${valeurJdk7}  -->  JDK21 : ${valeurJdk21}\n")
+				}  
+				continue          		
+            	}	
+            	
+            	
+		}	
+	}
+	else if (jsonObject7 != jsonObject21){
+		difference.add("TYPES INCOMPATIBLES : JDK7 de type : ${jsonObject7.getClass()}et JDK21 de type : ${jsonObject21.getClass()}\n")
+	}
+
+	// On parcour la liste et on rajoute chaque elemnets de la liste avec des suats à la ligne
+	/*
+	for(ligne in difference){
+			rapport.append(ligne + "\n")
+		}
+		*/	
+	return  difference
+}
+
+def ecrireRapport(rapport,differences) {
+
+	differences.each { ligne -> rapport.append(ligne) }
+     if (differences.size() == 0) {
+     	rapport.delete()
+     }  
+}

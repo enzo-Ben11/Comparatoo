@@ -1,0 +1,102 @@
+#----- MSISDN ET ULV --------------------------------------------------------------------------------
+ULV = 0x7125849C755700010001A9AF
+MSISDN = 33696371399
+
+#----- Loginwithcontext 1 - Request 1 ----------------------------------------------------------------
+loginwithcontext.request.channel = OCETMOI
+loginwithcontext.request.media = IOS
+loginwithcontext.request.callApplication = EC
+
+#----- setInvoices 1 - Request 1 ---------------------------------------------------------------------
+setinvoice.request.invoiceIds = [list]0107497203122024
+setinvoice.request.transactionId = cc5389a7-3454-4e04-a004-8dc1fda3c16a
+
+#----- setInvoiceToAnticipate 1 - Request 1 ----------------------------------------------------------
+setinvoicetoanticipate.request.invoiceAdvanceCode = 2M
+setinvoicetoanticipate.request.transactionId = b9a3a63f-815a-40fa-a589-2ad2acee12ac
+
+#----- createAccount 1 - Request 1 -------------------------------------------------------------------
+createaccount.request.channel = OCETMOI
+createaccount.request.media = IOS
+createaccount.request.media = oca.test@orange.com
+createaccount.request.subscribeMarketingList =[bool]true
+
+#----- updatePersonalData 1 - Request 1 --------------------------------------------------------------
+updatepersonaldata.request.googleAnalyticsId = UA-63512894-1
+updatepersonaldata.request.googleAnalyticsLabel = UNKNOW
+updatepersonaldata.request.type = ADDRESS
+
+#----- getMessageList 1 - Request 1 ------------------------------------------------------------------
+getmessagelist.request.messageType = TL_OFFER
+
+#----- endProcess 1 - Request 1 ----------------------------------------------------------------------
+endprocess.request.status = SUCCESS
+
+#----- setOption 1 - Request 1 -----------------------------------------------------------------------
+setoption.request.optionAtomicOfferId = AOOI_ServicePaiementSurCompteOrangeViaWHA
+setoption.request.function.code = FUOI_OptWHA_SeuilMensuel
+setoption.request.function.functionValueCode = VF_100
+setoption.request.actionType = edit
+setoption.request.transactionId = d5def03b-f832-4b51-92e8-b999769bb2c9
+
+#----- updateBillingData 1 - Request 1 ---------------------------------------------------------------
+updatebillingdata.request.phone1 = 0590000000
+updatebillingdata.request.mobile = 590690000000
+updatebillingdata.request.email = oca.test@orange.com
+updatebillingdata.request.postalAddress.local_addressDetails1 = escalier
+updatebillingdata.request.postalAddress.local_addressDetails1 = entree
+updatebillingdata.request.postalAddress.local_addressDetails1 = lieu-dit
+updatebillingdata.request.postalAddress.local_addressDetails1 = numero
+updatebillingdata.request.postalAddress.local_addressDetails1 = BAZIN
+updatebillingdata.request.postalAddress.local_addressDetails1 = PETIT CANAL
+updatebillingdata.request.postalAddress.local_addressDetails1 = 97131
+updatebillingdata.request.postalAddress.local_addressDetails1 = GUADELOUPE
+updatebillingdata.request.transactionId = 7c3fe714-d224-46ef-8a77-c5000df59b7a
+
+#----- getInvoiceList 1 - Request 1 -------------------------------------------------------------------
+getinvoicelist.request.period.excludedMonth = [int]0
+getinvoicelist.request.period.searchMonth = [int]6
+
+#----- getMessageList 1 - Request 1 -------------------------------------------------------------------
+getmessagelist.request.messageType = TL_OFFER
+
+#----- orderAndPayment 1 - Request 1 ------------------------------------------------------------------
+orderandpayment.request.googleAnalyticsId = UA-63512894-1
+orderandpayment.request.googleAnalyticsLabel = UNKNOW
+orderandpayment.request.transactionId = 612ea18a-a92b-4967-98a3-951982057151
+
+#----- Login 1 - Request 1 -----------------------------------------------------------------------------
+login.request.channel = OCETMOI
+login.request.media = IOS
+
+#----- emailControl - Request 1 ------------------------------------------------------------------------
+emailControl.request.email = oca.test@orange.com
+
+#----- updateBankAccountData 1 - Request 1 -------------------------------------------------------------
+updateBankAccountdata.request.iban = FR7610278003328792824837133
+
+#----- initializePaymentTypes 1 - Request 1 -------------------------------------------------------------
+initializepaymentypes.request.transactionId = affeb28a-3078-49e5-8739-1214dda78997
+
+#----- setVoucher 1 - Request 1 -------------------------------------------------------------
+setvoucher.request.atomicOfferId = AOAA_RechInternet_15E
+setvoucher.request.transactionId = 4cb8a4ac-96f0-4a4c-a318-98b10b006363
+
+#----- initializeCashCardPayment 1 - Request 1 ----------------------------------------------------------
+initializecashcardpayment.request.returnURL = https://preprod-espaceclienttc.caraibe.orange.fr/web/internal
+initializecashcardpayment.request.cancelPaymentURL = https://preprod-espaceclienttc.caraibe.orange.fr/web/internal
+initializecashcardpayment.request.transactionId = 153e4464-4732-482b-848b-d282a2c29310
+
+#----- validateCashcardPayment 1 - Request 1 ------------------------------------------------------------
+validatecashcardpayment.request.transactionId = 153e4464-4732-482b-848b-d282a2c29310
+
+#----- validatePayment 1 - Request 1 --------------------------------------------------------------------
+validatepayment.request.paymentType = CREDITCARD
+validatepayment.request.transactionId = 2a8fbb0d-a42c-4cda-848d-5488878942f1
+
+#----- updateOptions 1 - Request 1 --------------------------------------------------------------------
+updateoptions.request.transactionId = d5def03b-f832-4b51-92e8-b999769bb2c9
+
+#----- setTravelPass 1 - Request 1 --------------------------------------------------------------------
+settravelpass.request.atomicOfferId = AOAA_PassInternet_CA_9E
+settravelpass.request.transactionId = 92a9691e-9965-4ce0-bf35-a534bd9a9959

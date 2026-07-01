@@ -1,0 +1,188 @@
+import com.eviware.soapui.impl.wsdl.teststeps.RestTestRequestStep
+
+//------------- Lance le fichier de config ------------------------------------------------
+def projectPath = "C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/projetSoapJDK7/Rest Project MW-JDK7"
+def configFile  = new File(projectPath + "/config_Avec_Parametre_testfinal.txt")
+def config      = new Properties()
+configFile.withInputStream { config.load(it) }
+log.info("Config chargée depuis : " + projectPath)
+
+//-----------------------------------------------------------------------------------------
+
+// ---------------------- Mapping service --------------------------------------------------
+def paramsMap = [
+    "Loginwithcontext 1 - Request 1"          : "loginwithcontext",
+    "setInvoices 1 - Request 1"               : "setinvoice",
+    "setInvoiceToAnticipate 1 - Request 1"    : "setinvoicetoanticipate",
+    "createAccount 1 - Request 1"             : "createaccount",
+    "getMessageList 1 - Request 1"            : "getmessagelist",
+    "endProcess 1 - Request 1"                : "endprocess",
+    "setOption 1 - Request 1"                 : "setoption",
+    "updateBillingData 1 - Request 1"         : "updatebillingdata",
+    "getInvoiceList 1 - Request 1"            : "getinvoicelist",
+    "orderAndPayment 1 - Request 1"           : "orderandpayment",
+    "Login 1 - Request 1"                     : "login",
+    "emailControl - Request 1"                : "emailcontrol",
+    "updateBankAccountData 1 - Request 1"     : "updatebankaccountdata",
+    "initializePaymentTypes 1 - Request 1"    : "initializepaymenttypes",
+    "setVoucher 1 - Request 1"                : "setvoucher",
+    "initializeCashCardPayment 1 - Request 1" : "initializecashcardpayment",
+    "validateCashcardPayment 1 - Request 1"   : "validatecashcardpayment",
+    "validatePayment 1 - Request 1"           : "validatepayment",
+    "updateOptions 1 - Request 1"             : "updateoptions",
+    "setTravelPass 1 - Request 1"             : "settravelpass",
+    "updatePersonalData 1 - Request 1 - (getUserDetails)"    : "updatepersonaldataGetUserDetails",
+    "updatePersonalData 1 - Request 1 - (updateContactData)" : "updatepersonaldataContactData",
+    "updatePersonalData 1 - Request 1 - (getContactDetail)"  : "updatepersonaldataContactDetail"
+]
+
+//-----------------------------------------------------------------------------------------
+
+// ------------------------- Conversion de type --------------------------------------------
+def convertValue = { String raw ->
+    if (raw == null || raw.startsWith("[null]")) return null
+    if (raw.startsWith("[int]"))     return raw.replace("[int]", "").toInteger()
+    if (raw.startsWith("[bool]"))    return raw.replace("[bool]", "").toBoolean()
+    if (raw.startsWith("[list]"))    return raw.replace("[list]", "").split(",").collect { it.trim() }
+    if (raw.startsWith("[listint]")) return raw.replace("[listint]", "").split(",").collect { it.trim().toInteger() }
+    return raw
+}
+
+//-----------------------------------------------------------------------------------------
+
+// ---------- Injection du token GCP sur LoginWithContext AVANT de le lancer --------------
+def loginStepPre = testRunner.testCase.getTestStepByName("Loginwithcontext 1 - Request 1")
+
+def gcpToken = config.getProperty("GCP_TOKEN")
+if (gcpToken == null || gcpToken.isEmpty()) {
+    gcpToken = testRunner.testCase.testSuite.project.getPropertyValue("GCP_TOKEN")
+}
+
+if (gcpToken != null && !gcpToken.isEmpty()) {
+    def loginHeaders = new com.eviware.soapui.support.types.StringToStringMap()
+    loginHeaders.put("Authorization", "Bearer " + gcpToken)
+    loginHeaders.put("X_WASSUP_ULV",    config.getProperty("ULV"))
+    loginHeaders.put("X_WASSUP_MSISDN", config.getProperty("MSISDN"))
+    loginStepPre.httpRequest.setRequestHeaders(loginHeaders)
+    log.info("Token GCP injecté sur LoginWithContext avant exécution")
+} else {
+    log.warn("ATTENTION : Aucun token GCP trouvé — LoginWithContext risque d'échouer")
+}
+
+// ---------- Lancement de LoginWithContext ------------------------------------------------
+testRunner.runTestStepByName("Loginwithcontext 1 - Request 1")
+
+// ---------- Diagnostic complet de la réponse --------------------------------------------
+def loginStep     = testRunner.testCase.getTestStepByName("Loginwithcontext 1 - Request 1")
+def loginResponse = loginStep?.httpRequest?.response
+
+if (loginResponse == null) {
+    throw new RuntimeException("ERREUR : La réponse de LoginWithContext est null. Vérifier l'URL, le token GCP et la connectivité réseau.")
+}
+
+log.info("=== DIAGNOSTIC LoginWithContext ===")
+log.info("Status HTTP     : " + loginResponse.statusCode)
+log.info("Contenu réponse : " + loginResponse.responseContent)
+log.info("Tous les headers reçus :")
+loginResponse.responseHeaders.each { headerName, headerValues ->
+    log.info("  " + headerName + " : " + headerValues)
+}
+log.info("===================================")
+
+// ---------- Récupération du cookie -------------------------------------------------------
+def setCookieHeaders = loginResponse.responseHeaders["set-cookie"]
+
+if (setCookieHeaders == null || setCookieHeaders.size() == 0) {
+    throw new RuntimeException(
+        "ERREUR : Pas de set-Cookie dans la réponse de LoginWithContext.\n" +
+        "Status HTTP : " + loginResponse.statusCode + "\n" +
+        "Réponse     : " + loginResponse.responseContent + "\n" +
+        "Vérifier que le token GCP est valide et que le service retourne bien un cookie."
+    )
+}
+
+def cookie = setCookieHeaders[0]
+log.info("Cookie récupéré avec succès : " + cookie)
+
+//-----------------------------------------------------------------------------------------
+
+// --------------------------------------------- Boucle sur tous les services -------------
+for (testStep in testRunner.testCase.getTestStepList()) {
+
+    if (!(testStep instanceof RestTestRequestStep)) continue
+
+    def stepName = testStep.getName()
+    log.info("Traitement de : " + stepName)
+
+    // ---------- Construction du body JSON ------------------------------------------------
+    if (paramsMap.containsKey(stepName)) {
+        def prefix = paramsMap[stepName]
+
+        def serviceParams = [:]
+        for (entry in config) {
+            def key   = entry.key
+            def value = entry.value
+            if (key.startsWith("${prefix}.")) {
+                def cleanKey = key.replace("${prefix}.", "")
+                serviceParams[cleanKey] = value
+            }
+        }
+
+        def nestedMap = [:]
+        for (entry in serviceParams) {
+            def key   = entry.key
+            def value = entry.value
+            def parts = key.split("\\.")
+            def current = nestedMap
+
+            for (int i = 0; i < parts.length - 1; i++) {
+                def part = parts[i]
+                if (!current.containsKey(part)) {
+                    current[part] = [:]
+                }
+                current = current[part]
+            }
+
+            current[parts[parts.length - 1]] = convertValue(value)
+        }
+
+        def jsonBody   = groovy.json.JsonOutput.toJson(nestedMap)
+        def jsonPretty = groovy.json.JsonOutput.prettyPrint(jsonBody)
+        log.info("  Requête JSON : " + jsonPretty)
+
+        testStep.httpRequest.setRequestContent(jsonBody)
+
+    } else {
+        log.info("  Aucun paramètre trouvé pour ce step")
+    }
+
+    // ---------- Injection des headers + cookie -------------------------------------------
+    def headers = new com.eviware.soapui.support.types.StringToStringMap()
+    headers.put("X_WASSUP_ULV",    config.getProperty("ULV"))
+    headers.put("X_WASSUP_MSISDN", config.getProperty("MSISDN"))
+
+    if (stepName != "Loginwithcontext 1 - Request 1") {
+        headers.put("Cookie", cookie)
+        testStep.httpRequest.setRequestHeaders(headers)
+        testRunner.runTestStepByName(stepName)
+    } else {
+        testStep.httpRequest.setRequestHeaders(headers)
+    }
+
+    // ---------- Export de la réponse -----------------------------------------------------
+    def response = testRunner.testCase.getTestStepByName(stepName).httpRequest.response?.responseContent
+
+    def outputPath = "C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/ReponseJson/Services-Middelaware-JDK211/" + stepName + ".json"
+    def file = new File(outputPath)
+    file.parentFile.mkdirs()
+
+    if (response != null) {
+        file.text = response
+    } else {
+        file.text = '{"step":"' + stepName + '","warning":"Aucune réponse"}'
+    }
+
+    log.info("  Réponse exportée : " + response)
+}
+
+log.info("Tous les services ont été exécutés")

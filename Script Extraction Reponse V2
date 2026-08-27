@@ -1,0 +1,164 @@
+import com.eviware.soapui.impl.wsdl.teststeps.RestTestRequestStep
+//------------- Lance le fichier de config qui continet les paramètres d'entrés------------------------------------------------
+
+def projectPath = "C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/projetSoapJDK7/Rest Project MW-JDK7"
+def configFile  = new File(projectPath + "/configserviceJDK7.txt")
+def config      = new Properties()
+configFile.withInputStream { config.load(it) }
+log.info("Config chargée depuis : " + projectPath)
+
+//------------------------------------------------------------------------------------------------------------------------------
+
+// ----------------------Mapping service avec les paramètres d'entrés du fichier config-----------------------------------------
+
+def paramsMap = [
+    "accountuser/loginwithcontext"            : "loginwithcontext", 
+    "invoice/setInvoices"                     : "setinvoice", 
+    "invoice/setInvoiceToAnticipate"          : "setinvoicetoanticipate",  
+    "account/createAccount"                   : "createaccount", 
+    "informationBanner/getMessageList"        : "getmessagelist", 
+    "log/endProcess"                          : "endprocess", 
+    "option/setOption"                        : "setoption", 
+    "billingdata/updateBillingData"           : "updatebillingdata", 
+    "invoice/getInvoiceList"                  : "getinvoicelist",  
+    "order/orderAndPayment"                   : "orderandpayment", 
+    "account/login"                           : "login", 
+    "control/emailControl"                    : "emailcontrol",  
+    "bankAccount/updateBankAccountData"       : "updatebankaccountdata", 
+    "payment/initializePaymentTypes"          : "initializepaymenttypes", 
+    "voucher/setVoucher"                      : "setvoucher", 
+    "payment/initializeCashCardPayment"       : "initializecashcardpayment", 
+    "payment/validateCashcardPayment"         : "validatecashcardpayment", 
+    "payment/validatePayment"                 : "validatepayment", 
+    "option/updateOptions"                    : "updateoptions", 
+    "travel/setTravelPass"                    : "settravelpass", 
+    "voucher/getVoucherList"                  : "getVoucherList",
+    "crm/updateContactData"                   : "updateContactData",
+    "datasharing/shareData"                   : "shareData",
+    "scratchCard/activateScratchCard"         : "activateScratchCard",
+    "service/reloadMe"                        : "reloadMe",
+    "portability/getRIO"                      : "getRIO",
+    "crossdiscount/removeBeneficiary"         : "removeBeneficiary",
+    "crm/updateContactAuthorizations"         : "updateContactAuthorizations"
+]
+
+//-----------------------------------------------------------------------------------------------------------------------------
+
+// -------------------------------Fonction de conversion de type pour les valeurs des paramètres-------------------------------
+//De base les valeurs sont en String quand il n'y a aucune specification
+
+def convertValue = { String raw ->
+    if (raw.startsWith("[int]"))     return raw.replace("[int]", "").toInteger()
+    if (raw.startsWith("[bool]"))    return raw.replace("[bool]", "").toBoolean()
+    if (raw.startsWith("[list]"))    return raw.replace("[list]", "").split(",").collect { it.trim() }
+    if (raw.startsWith("[listint]")) return raw.replace("[listint]", "").split(",").collect { it.trim().toInteger() }
+    return raw
+}
+
+//-----------------------------------------------------------------------------------------------------------------------------
+
+// -----------------------------Lancer LoginWithContext et récupérer le cookie ------------------------------------------------
+
+testRunner.runTestStepByName("accountuser/loginwithcontext")
+
+def cookie = testRunner.testCase
+    .getTestStepByName("accountuser/loginwithcontext")
+    .httpRequest.response.responseHeaders["Set-Cookie"][0]
+log.info("Cookie récupéré : " + cookie)
+
+//-----------------------------------------------------------------------------------------------------------------------------
+
+// --------------------------------------------- Boucle sur tous les services contenu dasn le test Case------------------------
+
+for (testStep in testRunner.testCase.getTestStepList()) {
+
+    if (!(testStep instanceof RestTestRequestStep)) continue // recupere uniquement les requêtes presente dasn le testSTEP
+
+    def stepName = testStep.getName()
+    log.info("Traitement de " + stepName)
+
+    //Extraire les params et construire le JSON imbriqué
+    if (paramsMap.containsKey(stepName)) {
+        def prefix = paramsMap[stepName]
+
+	   //Parcour le fichier config et insere dans la Map service params les clés et valeurs de la requête Json
+        def serviceParams = [:]        
+        for (entry in config) {
+	   	def key = entry.key
+        	def value = entry.value
+    		if (key.startsWith("${prefix}.")) {
+        		def cleanKey = key.replace("${prefix}.", "")
+        		serviceParams[cleanKey] = value
+    		}
+	   }
+	   
+
+        def nestedMap = [:]
+	   for (entry in serviceParams) {   
+    	   	def key = entry.key
+        	def value = entry.value
+        	def parts = key.split("\\.")
+        	def current = nestedMap
+
+    // Parcours des parties sauf la dernière
+    			for (int i = 0; i < parts.length - 1; i++) {
+        			def part = parts[i]
+        			if (!current.containsKey(part)) {
+            			current[part] = [:]
+        			}
+        			current = current[part]
+    			}
+
+    // Assigner la valeur à la dernière clé
+    		current[parts[parts.length - 1]] = convertValue(value)
+	   }
+
+
+        def jsonBody   = groovy.json.JsonOutput.toJson(nestedMap)
+        def jsonPretty = groovy.json.JsonOutput.prettyPrint(jsonBody)
+        log.info("  Requête JSON  : " + jsonPretty)
+
+        testStep.httpRequest.setRequestContent(jsonBody)
+
+    } else {
+        log.info("  Aucun paramètre")
+    }
+
+//---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+//--------------------------------- Injecter les headers communs ------------------------------------------------------------------------------------------
+
+
+    def headers = new com.eviware.soapui.support.types.StringToStringMap()
+    headers.put("X_WASSUP_ULV",    config.getProperty("ULV"))
+    headers.put("X_WASSUP_MSISDN", config.getProperty("MSISDN"))
+    if (testStep.getName() != "accountuser/loginwithcontext"){ //Ne pas lancer 2 fois le loginWithContext mais permet l'export de sa réponse
+    		def result = testRunner.runTestStepByName(stepName)
+    		headers.put("Cookie", cookie)
+    }
+    
+    testStep.httpRequest.setRequestHeaders(headers)
+
+//---------------------------------------------Lancer le service en cours dasn la boucle for ---------------------------------------------------------------
+
+   
+    def response = testRunner.testCase.getTestStepByName(stepName)?.httpRequest?.response?.responseContent
+// ------------------------------------------------Exporter la réponse en fichier JSON----------------------------------------------------------------------
+
+	def outputPath = "C:/Users/cswp5655/OneDrive - orange.com/Documents/Comparatoo/ReponseJson/rapportTEST/" + stepName + ".json"
+	def file = new File(outputPath)
+	file.parentFile.mkdirs()
+	if(response!= null){
+		file.text = response
+	}
+	else {
+		file.text = '{"step":"' + stepName + '","warning":"Aucune réponse"}'
+
+	}
+	//vérrif
+	log.info("Contenu : " + response)
+    
+//----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+}
+log.info("Tous les services ont été exécutés")
